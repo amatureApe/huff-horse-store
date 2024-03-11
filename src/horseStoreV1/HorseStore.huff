@@ -1,0 +1,6 @@
+#define macro MAIN() = takes(0) returns(0) {
+    0x00             // [0]
+    calldataload    // [calldataload]
+    0xe0            // [0xe0, calldata (32)]
+    shr             // [function_selector]
+}
