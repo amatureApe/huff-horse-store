@@ -17,52 +17,70 @@ PUSH0                   // [0x00, msg.value]
 DUP1                    // [0x00, 0x00, msg.value]
 REVERT                  // [msg.value]
 
-JUMPDEST
-POP
-PUSH1 0xa5
-DUP1
-PUSH2 0x001b
-PUSH0
-CODECOPY
-PUSH0
-RETURN
-INVALID
-PUSH1 0x80
+// Jumpdest if msg.value == 0
+JUMPDEST                // [msg.value]
+POP                     // []
+PUSH1 0xa5              // [0xa5]
+DUP1                    // [0xa5, 0xa5]
+PUSH2 0x001b            // [0x001b, 0xa5, 0xa5]
+PUSH0                   // [0x00, 0x001b, 0xa5, 0xa5]
+CODECOPY                // [0xa5]               Memory: [runtime code]
+PUSH0                   // [0x00, 0xa5]
+RETURN                  // []
+INVALID                 // []
+
+// 2. Runtime Code
+// Entry point of all calls
+// free memory pointer
+PUSH1 0x80  
 PUSH1 0x40
 MSTORE
-CALLVALUE
-DUP1
-ISZERO
-PUSH1 0x0e
-JUMPI
-PUSH0
-DUP1
-REVERT
-JUMPDEST
-POP
-PUSH1 0x04
-CALLDATASIZE
-LT
-PUSH1 0x30
-JUMPI
-PUSH0
-CALLDATALOAD
-PUSH1 0xe0
-SHR
-DUP1
-PUSH4 0xcdfead2e
-EQ
-PUSH1 0x34
-JUMPI
+
+
+CALLVALUE               // [msg.value]
+DUP1                    // [msg.value, msg.value]
+ISZERO                  // [msg.value == 0, msg.value]
+PUSH1 0x0e              // [0x0e, msg.value == 0, msg.value]
+JUMPI                   // [msg.value]
+PUSH0                   // [0x00, msg.value]
+DUP1                    // [0x00, 0x00, msg.value]
+REVERT                  // [msg.value]
+
+// If msg.value == 0, start here
+// continue
+// checking to see if there is enough calldata for a function selector
+JUMPDEST                // [msg.value]
+POP                     // []
+PUSH1 0x04              // [0x04]
+CALLDATASIZE            // [msg.data.length, 0x04]
+LT                      // [msg.data.length < 0x04]
+PUSH1 0x30              // [0x30, msg.data.length < 0x04]
+JUMPI                   // []
+// if msg.data.length < 0x04 -> calldata_jump
+
+PUSH0                   // [0x00]
+CALLDATALOAD            // [32 bytes of calldata]
+PUSH1 0xe0              // [0xe0, 32 bytes of calldata]
+SHR                     // [function selector]
+DUP1                    // [function selector, function selector]
+PUSH4 0xcdfead2e        // [0xcdfead2e, function selector, function selector]
+EQ                      // [function selector == 0xcdfead2e, function selector]
+PUSH1 0x34              // [0x34, function selector == 0xcdfead2e, function selector]
+JUMPI                   // [function selector]
+// if function selector == 0xcdfead2e -> set_number_of_horses
+
 DUP1
 PUSH4 0xe026c017
 EQ
 PUSH1 0x45
 JUMPI
-JUMPDEST
-PUSH0
-DUP1
-REVERT
+
+// calldata_jump
+JUMPDEST                // []
+PUSH0                   // [0x00]
+DUP1                    // [0x00, 0x00]
+REVERT                  // []
+
 JUMPDEST
 PUSH1 0x43
 PUSH1 0x3f
