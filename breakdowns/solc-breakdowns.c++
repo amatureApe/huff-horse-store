@@ -62,6 +62,8 @@ PUSH0                   // [0x00]
 CALLDATALOAD            // [32 bytes of calldata]
 PUSH1 0xe0              // [0xe0, 32 bytes of calldata]
 SHR                     // [function selector]
+
+// Function dispatching for setNumberOfHorses
 DUP1                    // [function selector, function selector]
 PUSH4 0xcdfead2e        // [0xcdfead2e, function selector, function selector]
 EQ                      // [function selector == 0xcdfead2e, function selector]
@@ -69,68 +71,101 @@ PUSH1 0x34              // [0x34, function selector == 0xcdfead2e, function sele
 JUMPI                   // [function selector]
 // if function selector == 0xcdfead2e -> set_number_of_horses
 
-DUP1
-PUSH4 0xe026c017
-EQ
-PUSH1 0x45
-JUMPI
+// Function dispatching for readNumberOfHorses
+DUP1                    // [function selector, function selector]                
+PUSH4 0xe026c017        // [0xe026c017, function selector, function selector]
+EQ                      // [function selector == 0xe026c017, function selector]
+PUSH1 0x45              // [0x45, function selector == 0xe026c017, function selector]
+JUMPI                   // [function selector]
+// if function_selector == 0xe026c017 -> get_number_of_horses
 
 // calldata_jump
+// Revert Jumpdest
 JUMPDEST                // []
 PUSH0                   // [0x00]
 DUP1                    // [0x00, 0x00]
 REVERT                  // []
 
-JUMPDEST
-PUSH1 0x43
-PUSH1 0x3f
-CALLDATASIZE
-PUSH1 0x04
-PUSH1 0x59
-JUMP
-JUMPDEST
-PUSH0
-SSTORE
-JUMP
-JUMPDEST
-STOP
-JUMPDEST
-PUSH0
-SLOAD
-PUSH1 0x40
-MLOAD
-SWAP1
-DUP2
-MSTORE
-PUSH1 0x20
-ADD
-PUSH1 0x40
-MLOAD
-DUP1
-SWAP2
-SUB
-SWAP1
-RETURN
-JUMPDEST
-PUSH0
-PUSH1 0x20
-DUP3
-DUP5
-SUB
-SLT
-ISZERO
-PUSH1 0x68
-JUMPI
-PUSH0
-DUP1
+// updateHorseNumber jump dest 1
+// setup jumping program counters in the stack
+JUMPDEST                // [function selector]
+PUSH1 0x43              // [0x43, function selector]
+PUSH1 0x3f              // [0x3f, 0x43, function selector]
+CALLDATASIZE            // [msg.data.length, 0x3f, 0x43, function selector]
+PUSH1 0x04              // [0x04, msg.data.length, 0x3f, 0x43, function selector]
+PUSH1 0x59              // [0x59, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+JUMP                    // [0x04, msg.data.length, 0x3f, 0x43, function selector]
+
+// Jump dest 4
+// We can finally run an sstore to save our value to storage:
+// 1. Function dispatch
+// 2. Checked for msg.value
+// 3. Checked that calldata is long enough
+// 4. Received the number to use from the calldata
+JUMPDEST                // [calldata of numberToUpdate, 0x43, function selector]
+PUSH0                   // [0x00, calldata of numberToUpdate, 0x43, function selector]
+SSTORE                  // [0x43, function selector]
+JUMP                    // [function selector]
+// Jump dest 5
+
+// Jump dest 5
+JUMPDEST                // [function selector]
+STOP                    // [function selector]
+   
+// readNumberOfHorses jump dest 1
+JUMPDEST                // [function selector]
+PUSH0                   // [0x00, function selector]
+SLOAD                   // [numHorses, function selector]
+PUSH1 0x40              // [0x40, numHorses, function selector]
+MLOAD                   // [0x80, numHorses, function selector] // Memory [0x40: 0x80] (free memory pointer)
+SWAP1                   // [numHorses, 0x80, function selector]
+DUP2                    // [numHorses, 0x80, function selector, numHorses]
+MSTORE                  // [0x80, function selector] Memory: 0x80: numHorses
+PUSH1 0x20              // [0x20, 0x80, function selector]
+ADD                     // [0xa0, function selector]
+PUSH1 0x40              // [0x40, 0xa0, function selector]
+MLOAD                   // [0x80, 0xa0, function selector]         
+DUP1                    // [0x80, 0x80, 0xa0, function selector]
+SWAP2                   // [0xa0, 0x80, 0x80, function selector]
+SUB                     // [0x20, 0x80, function selector]
+SWAP1                   // [0x80, 0x20, function selector]
+// Return a value of size 32-bytes that is located at position 0x80 in memory
+RETURN                  // [function selector]
+
+// updateHorseNumber jump dest 2
+// Check to see if there is a value to update the horse number to
+// 4 bytes for the function selector, 32 bytes for the horse number
+JUMPDEST                // [0x04, msg.data.length, 0x3f, 0x43, function selector]
+PUSH0                   // [0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+PUSH1 0x20              // [0x20, 0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+DUP3                    // [0x04, 0x20, 0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+DUP5                    // [msg.data.length, 0x04, 0x20, 0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+SUB                     // [msg.data.length - 0x04, 0x20, 0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+// is there more calldata than just the function selector?
+SLT                     // [msg.data.length - 0x04 < 0x20, 0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+ISZERO                  // [msg.data.length - 0x04 < 0x20 == true, 0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+PUSH1 0x68              // [0x68, msg.data.length - 0x04 < 0x20 == true, 0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+JUMPI                   // [0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]        
+// We are goint to jump to jump dest 3 if there is more calldata than just the function selector + 0x20
+
+// Revert if there isn't enough calldata
+PUSH0                   // [0x00, 0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+DUP1                    // [0x00, 0x00, 0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
 REVERT
-JUMPDEST
-POP
-CALLDATALOAD
-SWAP2
-SWAP1
-POP
+
+// updateHorseNumber jump dest 3
+// Grab the calldata for updating the horse number
+// Delete some stuff in the stack
+JUMPDEST                // [0x00, 0x04, msg.data.length, 0x3f, 0x43, function selector]
+POP                     // [0x04, msg.data.length, 0x3f, 0x43, function selector]
+CALLDATALOAD            // [calldata of numberToUpdate, msg.data.length, 0x3f, 0x43, function selector]
+SWAP2                   // [0x3f, msg.data.length, calldata of numberToUpdate, 0x43, function selector]
+SWAP1                   // [msg.data.length, 0x3f, calldata of numberToUpdate, 0x3f, 0x43, function selector]
+POP                     // [0x3f, calldata of numberToUpdate, 0x43, function selector]
 JUMP
+// jump to jump dest 4
+
+// 3. Metadata
 INVALID
 LOG2
 PUSH5 0x6970667358
